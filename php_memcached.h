@@ -131,6 +131,7 @@ ZEND_BEGIN_MODULE_GLOBALS(php_memcached)
 	} server;
 #endif
 	long store_retry_count;
+	char *prefix_key;
 ZEND_END_MODULE_GLOBALS(php_memcached)
 
 PHP_MEMCACHED_API zend_class_entry *php_memc_get_ce(void);

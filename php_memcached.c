@@ -363,6 +363,7 @@ PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcached.use_sasl",	"0", PHP_INI_SYSTEM, OnUpdateBool, use_sasl,	zend_php_memcached_globals,	php_memcached_globals)
 #endif
 	STD_PHP_INI_ENTRY("memcached.store_retry_count",	"2",		PHP_INI_ALL, OnUpdateLong, store_retry_count,			zend_php_memcached_globals,     php_memcached_globals)
+	STD_PHP_INI_ENTRY("memcached.prefix_key",	NULL,		PHP_INI_SYSTEM, OnUpdateString, prefix_key,		zend_php_memcached_globals,     php_memcached_globals)
 PHP_INI_END()
 /* }}} */
 
@@ -450,6 +451,30 @@ static int php_memc_list_entry(void)
 	return le_memc;
 }
 
+static
+zend_bool s_set_prefix_key (struct memc_obj *m_obj, const char *key, size_t key_len TSRMLS_DC)
+{
+	const char *key_ptr;
+#if defined(LIBMEMCACHED_VERSION_HEX) && LIBMEMCACHED_VERSION_HEX == 0x00049000
+	char tmp[MEMCACHED_PREFIX_KEY_MAX_SIZE - 1];
+#endif
+	if (key_len == 0) {
+		key_ptr = NULL;
+	} else {
+		/*
+		   work-around a bug in libmemcached in version 0.49 that truncates the trailing
+		   character of the key prefix, to avoid the issue we pad it with a '0'
+		*/
+#if defined(LIBMEMCACHED_VERSION_HEX) && LIBMEMCACHED_VERSION_HEX == 0x00049000
+		snprintf(tmp, sizeof(tmp), "%s0", Z_STRVAL_P(value));
+		key_ptr = tmp;
+#else
+		key_ptr = key;
+#endif
+	}
+	return (memcached_callback_set(m_obj->memc, MEMCACHED_CALLBACK_PREFIX_KEY, key_ptr) == MEMCACHED_SUCCESS);
+}
+
 /* {{{ Memcached::__construct([string persistent_id[, callback on_new[, string connection_str]]]))
    Creates a Memcached object, optionally using persistent memcache connection */
 static PHP_METHOD(Memcached, __construct)
@@ -528,6 +553,12 @@ static PHP_METHOD(Memcached, __construct)
 				}
 				php_error_docref(NULL TSRMLS_CC, E_ERROR, "could not allocate libmemcached structure");
 				/* not reached */
+			}
+
+			if (MEMC_G(prefix_key)) {
+				if (!s_set_prefix_key (m_obj, MEMC_G(prefix_key), strlen (MEMC_G(prefix_key)) TSRMLS_CC)) {
+					php_error_docref(NULL TSRMLS_CC, E_ERROR, "could not set key prefix, check memcached.prefix_key ini-setting");
+				}
 			}
 		}
 
@@ -2410,6 +2441,11 @@ static PHP_METHOD(Memcached, getOption)
 			memcached_return retval;
 			char *result;
 
+			/* If key prefix is set it overrides the user-defined options. */
+			if (MEMC_G(prefix_key)) {
+				RETURN_STRING(MEMC_G(prefix_key), 1);
+			}
+
 			result = memcached_callback_get(m_obj->memc, MEMCACHED_CALLBACK_PREFIX_KEY, &retval);
 			if (retval == MEMCACHED_SUCCESS && result) {
 #if defined(LIBMEMCACHED_VERSION_HEX) && LIBMEMCACHED_VERSION_HEX == 0x00049000
@@ -2473,6 +2509,19 @@ static int php_memc_set_option(php_memc_t *i_obj, long option, zval *value TSRML
 
 		case MEMC_OPT_PREFIX_KEY:
 		{
+			/* If key prefix is set it overrides the user-defined options. */
+			if (MEMC_G(prefix_key)) {
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "cannot set OPT_PREFIX_KEY when memcached.prefix_key ini-setting is active");
+				return 0;
+			}
+
+			convert_to_string(value);
+
+			if (!s_set_prefix_key(m_obj, Z_STRVAL_P(value), Z_STRLEN_P(value) TSRMLS_CC)) {
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "bad key provided");
+				return 0;
+			}
+
 			char *key;
 #if defined(LIBMEMCACHED_VERSION_HEX) && LIBMEMCACHED_VERSION_HEX == 0x00049000
 			char tmp[MEMCACHED_PREFIX_KEY_MAX_SIZE - 1];
@@ -3522,6 +3571,7 @@ static void php_memc_init_globals(zend_php_memcached_globals *php_memcached_glob
 	MEMC_G(use_sasl) = 0;
 #endif
 	MEMC_G(store_retry_count) = 2;
+	MEMC_G(prefix_key) = NULL;
 }
 
 static void php_memc_destroy_globals(zend_php_memcached_globals *php_memcached_globals_p TSRMLS_DC)
