@@ -363,7 +363,7 @@ PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcached.use_sasl",	"0", PHP_INI_SYSTEM, OnUpdateBool, use_sasl,	zend_php_memcached_globals,	php_memcached_globals)
 #endif
 	STD_PHP_INI_ENTRY("memcached.store_retry_count",	"2",		PHP_INI_ALL, OnUpdateLong, store_retry_count,			zend_php_memcached_globals,     php_memcached_globals)
-	STD_PHP_INI_ENTRY("memcached.prefix_key",	NULL,		PHP_INI_SYSTEM, OnUpdateString, prefix_key,		zend_php_memcached_globals,     php_memcached_globals)
+	STD_PHP_INI_ENTRY("memcached.prefix_key",	NULL,		PHP_INI_USER, OnUpdateString, prefix_key,		zend_php_memcached_globals,     php_memcached_globals)
 PHP_INI_END()
 /* }}} */
 
@@ -555,7 +555,7 @@ static PHP_METHOD(Memcached, __construct)
 				/* not reached */
 			}
 
-			if (MEMC_G(prefix_key)) {
+			if (MEMC_G(prefix_key) && strlen (MEMC_G(prefix_key))) {
 				if (!s_set_prefix_key (m_obj, MEMC_G(prefix_key), strlen (MEMC_G(prefix_key)) TSRMLS_CC)) {
 					php_error_docref(NULL TSRMLS_CC, E_ERROR, "could not set key prefix, check memcached.prefix_key ini-setting");
 				}
@@ -2442,7 +2442,7 @@ static PHP_METHOD(Memcached, getOption)
 			char *result;
 
 			/* If key prefix is set it overrides the user-defined options. */
-			if (MEMC_G(prefix_key)) {
+			if (MEMC_G(prefix_key) && strlen (MEMC_G(prefix_key))) {
 				RETURN_STRING(MEMC_G(prefix_key), 1);
 			}
 
@@ -2510,7 +2510,7 @@ static int php_memc_set_option(php_memc_t *i_obj, long option, zval *value TSRML
 		case MEMC_OPT_PREFIX_KEY:
 		{
 			/* If key prefix is set it overrides the user-defined options. */
-			if (MEMC_G(prefix_key)) {
+			if (MEMC_G(prefix_key) && strlen (MEMC_G(prefix_key))) {
 				php_error_docref(NULL TSRMLS_CC, E_WARNING, "cannot set OPT_PREFIX_KEY when memcached.prefix_key ini-setting is active");
 				return 0;
 			}

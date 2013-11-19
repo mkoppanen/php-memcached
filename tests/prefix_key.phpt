@@ -16,6 +16,11 @@ memc_get_instance (array (
 					Memcached::OPT_PREFIX_KEY => 'foo_bar'
 				));
 
+ini_set ('memcached.prefix_key', '');
+
+$should_work = memc_get_instance (array (Memcached::OPT_PREFIX_KEY => 'foo_bar'));
+var_dump ($should_work->getOption (Memcached::OPT_PREFIX_KEY));
+
 echo "OK". PHP_EOL;
 
 --EXPECTF--
@@ -23,4 +28,5 @@ string(12) "test_prefix_"
 
 Warning: Memcached::setOptions(): cannot set OPT_PREFIX_KEY when memcached.prefix_key ini-setting is active in %s on line %d
 Failed to set options
+string(7) "foo_bar"
 OK
