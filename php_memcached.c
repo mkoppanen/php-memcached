@@ -2508,7 +2508,6 @@ static int php_memc_set_option(php_memc_t *i_obj, long option, zval *value TSRML
 			break;
 
 		case MEMC_OPT_PREFIX_KEY:
-		{
 			/* If key prefix is set it overrides the user-defined options. */
 			if (MEMC_G(prefix_key) && strlen (MEMC_G(prefix_key))) {
 				php_error_docref(NULL TSRMLS_CC, E_WARNING, "cannot set OPT_PREFIX_KEY when memcached.prefix_key ini-setting is active");
@@ -2521,32 +2520,7 @@ static int php_memc_set_option(php_memc_t *i_obj, long option, zval *value TSRML
 				php_error_docref(NULL TSRMLS_CC, E_WARNING, "bad key provided");
 				return 0;
 			}
-
-			char *key;
-#if defined(LIBMEMCACHED_VERSION_HEX) && LIBMEMCACHED_VERSION_HEX == 0x00049000
-			char tmp[MEMCACHED_PREFIX_KEY_MAX_SIZE - 1];
-#endif
-			convert_to_string(value);
-			if (Z_STRLEN_P(value) == 0) {
-				key = NULL;
-			} else {
-				/*
-				   work-around a bug in libmemcached in version 0.49 that truncates the trailing
-				   character of the key prefix, to avoid the issue we pad it with a '0'
-				*/
-#if defined(LIBMEMCACHED_VERSION_HEX) && LIBMEMCACHED_VERSION_HEX == 0x00049000
-				snprintf(tmp, sizeof(tmp), "%s0", Z_STRVAL_P(value));
-				key = tmp;
-#else
-				key = Z_STRVAL_P(value);
-#endif
-			}
-			if (memcached_callback_set(m_obj->memc, MEMCACHED_CALLBACK_PREFIX_KEY, key) == MEMCACHED_BAD_KEY_PROVIDED) {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "bad key provided");
-				return 0;
-			}
-			break;
-		}
+		break;
 
 		case MEMCACHED_BEHAVIOR_KETAMA_WEIGHTED:
 			flag = (memcached_behavior) option;
